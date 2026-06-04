@@ -214,7 +214,9 @@ class TaskManager
 					doesSchedule = true
 					readyTasks << t
 					if runningTask != nil
-						readyTasks << runningTask
+						# runningTask が t と同一オブジェクトの場合（デッドラインミス時）は
+						# 既に readyTasks << t で追加済みのため二重登録しない
+						readyTasks << runningTask unless runningTask.equal?(t)
 						runningTask = nil
 					end
 					readyTasks = queueSort(readyTasks, scheduler)
@@ -319,7 +321,7 @@ hyperPeriod.times do |time|
 			doesSchedule = true
 			readyTasks << t
 			if runningTask != nil
-				readyTasks << runningTask
+				readyTasks << runningTask unless runningTask.equal?(t)
 				runningTask = nil
 			end
 			readyTasks = manager.queueSort(readyTasks,scheduler)
