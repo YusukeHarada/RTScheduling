@@ -1,11 +1,13 @@
 ###################
 # Yusuke Harada
-# Information Engineering 
+# Information Engineering
 # 2015/06/23
 ###################
 # Selectable Scheduler
 RM = 0
 EDF = 1
+$logs ||= []
+$result ||= []
 # Task
 class Task
 	# 初期化
@@ -193,8 +195,72 @@ class TaskManager
 		$result << "deadline miss:#{@deadlineMissCnt}\n"
 		$result << "deadline over:#{@deadlineOverCnt}\n"
 	end
+
+	# スケジューリングシミュレーションを実行して結果を返す（テスト用）
+	def simulate(tasks, scheduler)
+		hyperPeriod = calcHyperPeriod(tasks)
+		readyTasks = []
+		runningTask = nil
+		doesSchedule = false
+		executedTasks = []
+
+		hyperPeriod.times do |time|
+			for t in tasks do
+				if time % t.period == 0
+					if t.remainingTime > 0
+						terminateTask(t, time)
+					end
+					activateTask(t, time)
+					doesSchedule = true
+					readyTasks << t
+					if runningTask != nil
+						readyTasks << runningTask
+						runningTask = nil
+					end
+					readyTasks = queueSort(readyTasks, scheduler)
+				end
+			end
+			if doesSchedule
+				highPriTask = readyTasks.shift()
+				if runningTask == nil
+					runningTask = highPriTask
+				elsif highPriTask != runningTask
+					readyTasks << runningTask
+					readyTasks = queueSort(readyTasks, scheduler)
+					runningTask = highPriTask
+				end
+				doesSchedule = false
+			end
+			if runningTask != nil
+				runningTask.remainingTime -= 1
+				executedTasks << runningTask.id
+			else
+				executedTasks << -1
+			end
+			if runningTask != nil
+				if runningTask.remainingTime == 0
+					terminateTask(runningTask, time)
+					if readyTasks.size > 0
+						runningTask = readyTasks.shift()
+					else
+						runningTask = nil
+					end
+				end
+			end
+		end
+		if runningTask != nil && runningTask.remainingTime > 0 && runningTask.remainingTime != -1
+			terminateTask(runningTask, hyperPeriod - 1)
+		end
+		{
+			hyperPeriod: hyperPeriod,
+			executedTasks: executedTasks,
+			deadlineMissCnt: @deadlineMissCnt,
+			deadlineOverCnt: @deadlineOverCnt
+		}
+	end
 end
 
+if __FILE__ == $0
 ##### Test Codes #####
 # タスク実行管理オブジェクトの生成
 $logs = []
@@ -304,3 +370,4 @@ $result << "\n"
 
 for l in $logs do print l end
 for r in $result do print r end
+end
